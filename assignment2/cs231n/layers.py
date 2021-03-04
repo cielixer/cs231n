@@ -816,7 +816,19 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+  # 0, 1, 2, 3
+    N, C, H, W = x.shape # input tensor size = (N, C, H, W)
+
+    # needs to be rearraged by C-axis as pivot
+    # batchnorm tensor size = (N, D) which is (...(rest), C)
+    
+    #                     N, H, W, C
+    x_ = np.transpose(x, [0, 2, 3, 1]).reshape(-1, C)
+    out, cache = batchnorm_forward(x_, gamma, beta, bn_param)
+
+    # (..., C) -> (N, H, W, C) -> (N, C, H, W)
+    out = out.reshape(N, H, W, C).transpose(0, 3, 1, 2)
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -850,7 +862,13 @@ def spatial_batchnorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+  # 0, 1, 2, 3
+    N, C, H, W = dout.shape
+    
+    #                           N, H, W, C
+    dout_ = np.transpose(dout, [0, 2, 3, 1]).reshape(-1, C)
+    dx, dgamma, dbeta = batchnorm_backward_alt(dout_, cache)
+    dx = dx.reshape(N, H, W, C).transpose(0, 3, 1, 2)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
