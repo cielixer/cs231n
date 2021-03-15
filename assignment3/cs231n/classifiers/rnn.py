@@ -151,7 +151,35 @@ class CaptioningRNN(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        N, D = features.shape
+        _, T = captions.shape
+        T -= 1
+        _, H = Wx.shape
+
+        aff_out, aff_cache = affine_forward(features, W_proj, b_proj)
+        embed_out, embed_cache = word_embedding_forward(captions_in, W_embed)
+
+        if self.cell_type == 'rnn':
+          cell_forward = rnn_forward
+          cell_backward = rnn_backward
+        elif self.cell_type == 'lstm':
+          cell_forward = lstm_forward
+          cell_backward = lstm_backward
+        out, cell_cache = cell_forward(embed_out, aff_out, Wx, Wh, b)
+
+        out, temp_cache = temporal_affine_forward(out, W_vocab, b_vocab)
+
+        loss, soft_cache = temporal_softmax_loss(out, captions_out, mask)
+
+        dout = soft_cache
+        dout, grads["W_vocab"], grads["b_vocab"] = temporal_affine_backward(dout, temp_cache)
+
+        dword, daff, grads["Wx"], grads["Wh"], grads['b'] = cell_backward(dout, cell_cache)
+
+        grads['W_embed'] = word_embedding_backward(dword, embed_cache)
+
+        dfeatures, grads["W_proj"], grads["b_proj"] = affine_backward(daff, aff_cache)
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -219,7 +247,25 @@ class CaptioningRNN(object):
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        pass
+        N, D = features.shape
+
+        # Wih
+        prev_h, _ = affine_forward(features, W_proj, b_proj)
+        prev_word = [self._start] * N
+        
+        if self.cell_type == 'rnn':
+          cell_forward = rnn_step_forward
+        elif self.cell_type == 'lstm':
+          cell_forward = lstm_step_forward
+        
+        for i in range(max_length):
+          embed_word, _ = word_embedding_forward(prev_word, W_embed)
+          next_h, _ = cell_forward(embed_word, prev_h, Wx, Wh, b)
+          vocab_out, _ = affine_forward(next_h, W_vocab, b_vocab)
+          captions[:, i] = list(np.argmax(vocab_out, axis=1))
+          prev_word = captions[:, i]
+          prev_h = next_h
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
