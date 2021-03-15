@@ -908,7 +908,14 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N, C, H, W = x.shape
+    x = x.reshape((N, G, C // G, H, W))
+    mean = x.mean((2, 3, 4), keepdims=True)
+    var = x.var((2, 3, 4), keepdims=True)
+    out = (x - mean) / np.sqrt(eps + var)
+    out = out.reshape(N, C, H, W)
+    cache = x, G, gamma, beta, out.copy(), mean, var, eps
+    out = out * gamma + beta
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -938,8 +945,21 @@ def spatial_groupnorm_backward(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    x, x_mean, x_var, x_hat, eps, G, gamma, beta = cache
 
+  # 0, 1, 2, 3
+    N, C, H, W = dout.shape
+    x, G, gamma, beta, x_halt, mean, var, eps = cache
+    dbeta = dout.sum((0, 2, 3))[None, :, None, None]
+    dgamma = (dout * x_halt).sum((0, 2, 3))[None, :, None, None]
+
+    dx_hat = (dout * gamma).reshape(N, G, C // G, H, W)
+    t = H * W * C // G
+    dsigma = -0.5 * np.sum(dx_hat * (x - mean), axis=(2, 3, 4)) * np.power(var.squeeze() + eps, -1.5)
+    dmu = -np.sum(dx_hat / np.sqrt(var + eps), axis=(2, 3, 4)) - 2.0 * dsigma * np.sum(x - mean, axis=(2, 3, 4)) / t
+    dx = dx_hat / np.sqrt(var + eps) + dsigma.reshape(N, G, 1, 1, 1) * 2.0 * (x - mean) / t + dmu.reshape(N, G, 1, 1, 1) / t
+    dx = dx.reshape(N, C, H, W)
+    
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
